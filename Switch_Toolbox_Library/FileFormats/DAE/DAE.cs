@@ -367,7 +367,7 @@ namespace Toolbox.Library
                     foreach (var vertex in mesh.vertices)
                     {
                         if (vertex.nrm != Vector3.Zero) HasNormals = true;
-                        if (vertex.col != Vector4.One && settings.UseVertexColors) HasColors = true;
+                        if (settings.UseVertexColors) HasColors = true;
                         if (vertex.col2 != Vector4.One && settings.UseVertexColors) HasColors2 = true;
                         if (vertex.col3 != Vector4.One && settings.UseVertexColors) HasColors3 = true;
                         if (vertex.col4 != Vector4.One && settings.UseVertexColors) HasColors4 = true;
@@ -511,7 +511,7 @@ namespace Toolbox.Library
                         writer.WriteGeometrySource(mesh.Text, SemanticType.COLOR, Color3.ToArray(), triangleLists.ToArray(), 2);
                     if (HasColors4)
                         writer.WriteGeometrySource(mesh.Text, SemanticType.COLOR, Color4.ToArray(), triangleLists.ToArray(), 3);
-
+                    
                     if (HasUV0)
                         writer.WriteGeometrySource(mesh.Text, SemanticType.TEXCOORD, UV0.ToArray(), triangleLists.ToArray(), 0);
 
