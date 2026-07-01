@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,14 +14,14 @@ namespace FirstPlugin
         public static string FTEX = GetFilter(".bftex", ".dds", ".dds2", ".png", ".bmp", ".tga", ".jpg", ".tiff", ".tif", ".gif");
         public static string GTX = GetFilter(".dds", ".dds2", ".png", ".bmp", ".tga", ".jpg", ".tiff", ".tif", ".gif");
 
-        public static string FMDL = GetFilter(".dae", ".bfmdl", ".fbx", ".obj", ".csv");
-        public static string FMDL_EXPORT = GetFilter(".dae", ".bfmdl");
+        public static string FMDL = GetFilter(".dae", ".bfmdl", ".fbx", ".gltf", ".glb", ".obj", ".csv");
+        public static string FMDL_EXPORT = GetFilter(".dae", ".fbx", ".gltf", ".glb", ".bfmdl");
         public static string FSKL = GetFilter(".bfskl");
         public static string FSHP = GetFilter(".bfobj", ".dae");
         public static string BONE = GetFilter(".bfbon");
         public static string FMAT = GetFilter(".bfmat");
 
-        public static string FSKA_EXPORT = GetFilter(".bfska", ".anim", ".seanim", ".smd", ".chr0");
+        public static string FSKA_EXPORT = GetFilter(".bfska", ".fbx", ".gltf", ".glb", ".anim", ".seanim", ".smd", ".chr0");
         public static string FSKA_REPLACE = GetFilter(".bfska",".anim", ".seanim", ".smd", ".chr0");
 
         public static string FMAA = GetFilter(".bfmaa",".yaml", ".gif");
@@ -124,6 +124,8 @@ namespace FirstPlugin
                     case ".bfscn": filters.Add(ext, "Bfres Scene Animation"); break;
                     case ".dae": filters.Add(ext, "DAE"); break;
                     case ".fbx": filters.Add(ext, "FBX"); break;
+                    case ".gltf": filters.Add(ext, "glTF 2.0"); break;
+                    case ".glb": filters.Add(ext, "glTF 2.0 Binary"); break;
                     case ".obj": filters.Add(ext, "OBJ"); break;
                     case ".csv": filters.Add(ext, "CSV"); break;
                     case ".dds": filters.Add(ext, "Microsoft DDS"); break;

@@ -554,6 +554,15 @@ namespace Bfres.Structs
                 case ".obj":
                     OBJ.ExportModel(FileName, this, GetTextures());
                     break;
+                case ".fbx":
+                    AssimpSaver assimpSaver = new AssimpSaver();
+                    assimpSaver.SaveFromModel(this, FileName, GetTextures(), Skeleton, Skeleton.Node_Array.ToList());
+                    break;
+                case ".gltf":
+                case ".glb":
+                    GltfSaver gltfSaver = new GltfSaver();
+                    gltfSaver.SaveFromModel(this, FileName, GetTextures(), Skeleton, Skeleton.Node_Array.ToList());
+                    break;
                 default:
 
                     ExportModelSettings settings = new ExportModelSettings();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -78,7 +78,7 @@ namespace Toolbox.Library
             progressBar.Show();
             progressBar.Refresh();
 
-            if (settings.UseOldExporter)
+            if (settings.UseOldExporter || System.IO.Path.GetExtension(FileName).ToLower() == ".fbx")
             {
                 AssimpSaver saver = new AssimpSaver();
                 STGenericModel model = new STGenericModel();

@@ -65,6 +65,10 @@ namespace Toolbox.Library.Collada
         public void WriteAsset()
         {
             Writer.WriteStartElement("asset");
+            Writer.WriteStartElement("unit");
+            Writer.WriteAttributeString("meter", "1");
+            Writer.WriteAttributeString("name", "meter");
+            Writer.WriteEndElement();
             Writer.WriteEndElement();
         }
 

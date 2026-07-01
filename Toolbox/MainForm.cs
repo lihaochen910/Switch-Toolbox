@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -1566,6 +1566,7 @@ namespace Toolbox
         {
             List<string> Formats = new List<string>();
             Formats.Add("DAE (.dae)");
+            Formats.Add("FBX (.fbx)");
 
             failedFiles = new List<string>();
 

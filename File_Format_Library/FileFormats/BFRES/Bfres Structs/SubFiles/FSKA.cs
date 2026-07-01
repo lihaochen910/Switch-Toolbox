@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using Syroot.NintenTools.NSW.Bfres;
@@ -202,6 +202,16 @@ namespace Bfres.Structs
                 }
                 else if (ext == ".smd")
                     SMD.Save(this, skeleton, FileName);
+                else if (ext == ".fbx")
+                {
+                    AssimpSaver saver = new AssimpSaver();
+                    saver.SaveAnimation(this, skeleton, FileName);
+                }
+                else if (ext == ".gltf" || ext == ".glb")
+                {
+                    GltfSaver saver = new GltfSaver();
+                    saver.SaveAnimation(this, skeleton, FileName);
+                }
                 else if (ext == ".anim")
                     ANIM.CreateANIM(FileName, this, skeleton);
                 else if (ext == ".seanim")

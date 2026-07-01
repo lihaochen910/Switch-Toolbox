@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Collections.Generic;
@@ -14,47 +14,71 @@ namespace Toolbox.Library
 {
     public class AssimpSaver
     {
+        //When true, skips the success/failure MessageBox and progress bar UI.
+        //Used by headless/console callers so exports don't block on a dialog.
+        public static bool SuppressDialogs = false;
+
         private List<string> ExtractedTextures = new List<string>();
 
         public List<string> BoneNames = new List<string>();
 
         STProgressBar progressBar;
 
-        public void SaveFromModel(STGenericModel model, string FileName, List<STGenericTexture> Textures, STSkeleton skeleton = null, List<int> NodeArray = null)
+        public void SaveFromModel(STGenericModel model, string FileName, List<STGenericTexture> Textures, STSkeleton skeleton = null, List<int> NodeArray = null, List<Toolbox.Library.Animations.Animation> Animations = null)
         {
-            SaveFromModel(model.Objects.ToList(), model.Materials.ToList(), FileName, Textures, skeleton, NodeArray);
+            SaveFromModel(model.Objects.ToList(), model.Materials.ToList(), FileName, Textures, skeleton, NodeArray, Animations);
         }
 
-        public void SaveFromModel(List<STGenericObject> Meshes, List<STGenericMaterial> Materials, string FileName, List<STGenericTexture> Textures, STSkeleton skeleton = null, List<int> NodeArray = null)
+        public void SaveFromModel(List<STGenericObject> Meshes, List<STGenericMaterial> Materials, string FileName, List<STGenericTexture> Textures, STSkeleton skeleton = null, List<int> NodeArray = null, List<Toolbox.Library.Animations.Animation> Animations = null)
         {
             ExtractedTextures.Clear();
 
             Scene scene = new Scene();
             scene.RootNode = new Node("RootNode");
 
-            progressBar = new STProgressBar();
-            progressBar.Task = "Exporting Skeleton...";
-            progressBar.Value = 0;
-            progressBar.StartPosition = FormStartPosition.CenterScreen;
-            progressBar.Show();
-            progressBar.Refresh();
+            if (!SuppressDialogs)
+            {
+                progressBar = new STProgressBar();
+                progressBar.Task = "Exporting Skeleton...";
+                progressBar.Value = 0;
+                progressBar.StartPosition = FormStartPosition.CenterScreen;
+                progressBar.Show();
+                progressBar.Refresh();
+            }
 
             SaveSkeleton(skeleton, scene.RootNode);
             SaveMaterials(scene, Materials, FileName, Textures);
 
-            progressBar.Task = "Exporting Meshes...";
-            progressBar.Value = 50;
+            if (progressBar != null)
+            {
+                progressBar.Task = "Exporting Meshes...";
+                progressBar.Value = 50;
+            }
 
             SaveMeshes(scene, Meshes, skeleton, FileName, NodeArray);
 
-            progressBar.Task = "Saving File...";
-            progressBar.Value = 80;
+            //Merge any matching skeletal animations into this same scene so the model,
+            //skeleton and its animations are written to a single file.
+            if (Animations != null && skeleton != null)
+            {
+                foreach (var anim in Animations)
+                    scene.Animations.Add(BuildAssimpAnimation(anim, skeleton));
+            }
+
+            if (progressBar != null)
+            {
+                progressBar.Task = "Saving File...";
+                progressBar.Value = 80;
+            }
 
             SaveScene(FileName, scene, Meshes);
 
-            progressBar.Value = 100;
-            progressBar.Close();
-            progressBar.Dispose();
+            if (progressBar != null)
+            {
+                progressBar.Value = 100;
+                progressBar.Close();
+                progressBar.Dispose();
+            }
         }
 
         private void SaveScene(string FileName, Scene scene, List<STGenericObject> Meshes)
@@ -72,6 +96,8 @@ namespace Toolbox.Library
                     formatID = "collada";
                 if (ext == ".ply")
                     formatID = "ply";
+                if (ext == ".fbx")
+                    formatID = "fbx";
 
                 bool ExportSuccessScene = v.ExportFile(scene, FileName, formatID, PostProcessSteps.FlipUVs);
                 if (ExportSuccessScene)
@@ -79,10 +105,15 @@ namespace Toolbox.Library
                     if (ext == ".dae")
                         WriteExtraSkinningInfo(FileName, scene, Meshes);
 
-                    MessageBox.Show($"Exported {FileName} Successfuly!");
+                    if (!SuppressDialogs)
+                        MessageBox.Show($"Exported {FileName} Successfuly!");
+                    else
+                        Console.WriteLine($"Exported {FileName} Successfuly!");
                 }
-                else
+                else if (!SuppressDialogs)
                     MessageBox.Show($"Failed to export {FileName}!");
+                else
+                    Console.Error.WriteLine($"Failed to export {FileName}!");
             }
 
         }
@@ -525,9 +556,12 @@ namespace Toolbox.Library
                 {
                     ExtractedTextures.Add(path);
 
-                    progressBar.Task = $"Exporting Texture {Textures[i].Text}";
-                    progressBar.Value = ((i * 100) / Textures.Count);
-                    progressBar.Refresh();
+                    if (progressBar != null)
+                    {
+                        progressBar.Task = $"Exporting Texture {Textures[i].Text}";
+                        progressBar.Value = ((i * 100) / Textures.Count);
+                        progressBar.Refresh();
+                    }
 
                     var bitmap = Textures[i].GetBitmap();
                     bitmap.Save(path);
@@ -564,7 +598,7 @@ namespace Toolbox.Library
                     TextureSlot slot2 = new TextureSlot(path, ConvertToAssimpTextureType(tex.Type), 0, TextureMapping.FromUV,
                             0, 1.0f, Assimp.TextureOperation.Add, ConvertToAssimpWrapType(tex.WrapModeS), ConvertToAssimpWrapType(tex.WrapModeT), 0);
 
-                    material.AddMaterialTexture(ref slot2);
+                    material.AddMaterialTexture(slot2);
                 }
                 scene.Materials.Add(material);
             }
@@ -647,6 +681,97 @@ namespace Toolbox.Library
 
             foreach (STBone child in bone.GetChildren())
                 SaveBones(boneNode, child, skeleton);
+        }
+
+        //Builds an Assimp animation whose channels reference the given skeleton's bones.
+        //Channels for bones not present in the skeleton are skipped (referencing a
+        //missing node makes the native FBX exporter crash with an access violation).
+        private Assimp.Animation BuildAssimpAnimation(Toolbox.Library.Animations.Animation anim, STSkeleton skeleton)
+        {
+            Assimp.Animation assimpAnim = new Assimp.Animation();
+            assimpAnim.Name = anim.Text;
+            assimpAnim.DurationInTicks = anim.FrameCount;
+            assimpAnim.TicksPerSecond = 30;
+
+            var sceneBoneNames = new HashSet<string>(skeleton.bones.Select(b => b.Text));
+
+            foreach (var boneNode in anim.Bones)
+            {
+                if (!sceneBoneNames.Contains(boneNode.Text))
+                {
+                    Console.WriteLine($"Skipping animation channel for bone '{boneNode.Text}' (not present in the target skeleton).");
+                    continue;
+                }
+
+                var channel = new Assimp.NodeAnimationChannel();
+                channel.NodeName = boneNode.Text;
+
+                for (int frame = 0; frame <= anim.FrameCount; frame++)
+                {
+                    float time = (float)frame;
+
+                    var pos = boneNode.GetPosition(frame);
+                    channel.PositionKeys.Add(new Assimp.VectorKey(time, new Assimp.Vector3D(pos.X, pos.Y, pos.Z)));
+
+                    //Bfres bone animations are usually stored as Euler angles (EulerXYZ).
+                    //Match the playback logic and convert to a quaternion, otherwise the
+                    //raw track values get stuffed into a quaternion and the rotation is wrong.
+                    OpenTK.Quaternion rot;
+                    if (boneNode.RotType == Toolbox.Library.Animations.Animation.RotationType.EULER)
+                    {
+                        float rx = boneNode.XROT.HasAnimation() ? boneNode.XROT.GetValue(frame) : 0;
+                        float ry = boneNode.YROT.HasAnimation() ? boneNode.YROT.GetValue(frame) : 0;
+                        float rz = boneNode.ZROT.HasAnimation() ? boneNode.ZROT.GetValue(frame) : 0;
+                        rot = STMath.FromEulerAngles(new OpenTK.Vector3(rx, ry, rz));
+                    }
+                    else
+                        rot = boneNode.GetRotation(frame);
+                    //Ensure a valid unit quaternion. Quaternion-type tracks that are only
+                    //partially keyed can yield a non-normalized value (e.g. (0,0,0,0.5));
+                    //normalize it, and fall back to identity if it is degenerate.
+                    if (rot.Length > 0.0001f)
+                        rot.Normalize();
+                    else
+                        rot = OpenTK.Quaternion.Identity;
+                    channel.RotationKeys.Add(new Assimp.QuaternionKey(time, new Assimp.Quaternion(rot.W, rot.X, rot.Y, rot.Z)));
+
+                    var scale = boneNode.GetScale(frame);
+                    channel.ScalingKeys.Add(new Assimp.VectorKey(time, new Assimp.Vector3D(scale.X, scale.Y, scale.Z)));
+                }
+
+                assimpAnim.NodeAnimationChannels.Add(channel);
+            }
+
+            return assimpAnim;
+        }
+
+        public void SaveAnimation(Toolbox.Library.Animations.Animation anim, STSkeleton skeleton, string FileName)
+        {
+            Scene scene = new Scene();
+            scene.RootNode = new Node("RootNode");
+
+            SaveSkeleton(skeleton, scene.RootNode);
+
+            scene.Animations.Add(BuildAssimpAnimation(anim, skeleton));
+
+            using (var v = new AssimpContext())
+            {
+                string ext = System.IO.Path.GetExtension(FileName).ToLower();
+                string formatID = "fbx";
+
+                bool ExportSuccessScene = v.ExportFile(scene, FileName, formatID, PostProcessSteps.FlipUVs);
+                if (ExportSuccessScene)
+                {
+                    if (!SuppressDialogs)
+                        MessageBox.Show($"Exported {FileName} Successfuly!");
+                    else
+                        Console.WriteLine($"Exported {FileName} Successfuly!");
+                }
+                else if (!SuppressDialogs)
+                    MessageBox.Show($"Failed to export {FileName}!");
+                else
+                    Console.Error.WriteLine($"Failed to export {FileName}!");
+            }
         }
     }
 }

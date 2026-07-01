@@ -35,7 +35,7 @@ namespace Toolbox.Library.Animations
                 startUnitless = 0;
                 endUnitless = 0;
                 timeUnit = "ntscf";
-                linearUnit = "cm";
+                linearUnit = "m";
                 angularUnit = "deg";
             }
         }
@@ -243,59 +243,65 @@ namespace Toolbox.Library.Animations
                         Animation.KeyNode node = anim.GetBone(bone.Text);
                         int ac = 0;
 
+                        // When a bone's local Y position in parent BFRES space is negative,
+                        // the parent's Y axis is anti-parallel to the child direction.
+                        // Blender's Collada importer flips that bone's orientation,
+                        // so we apply a Rz(180°) correction: negate local X and Y.
+                        bool blenderCorrection = bone.GetPosition().Y < -0.01f;
+
                         if (node.XPOS.HasAnimation())
                         {
                             file.WriteLine("anim translate.translateX translateX " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeKey(file, node.XPOS, node, anim.Size(), "translateX");
+                            writeKey(file, node.XPOS, node, anim.Size(), "translateX", false, blenderCorrection);
                             file.WriteLine("}");
                         }
                         else
                         {
                             file.WriteLine("anim translate.translateX translateX " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeNotHasAnimKey(file, anim, vbn, bone, "translateX");
+                            writeNotHasAnimKey(file, anim, vbn, bone, "translateX", blenderCorrection);
                             file.WriteLine("}");
                         }
 
                         if (node.YPOS.HasAnimation())
                         {
                             file.WriteLine("anim translate.translateY translateY " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeKey(file, node.YPOS, node, anim.Size(), "translateY");
+                            writeKey(file, node.YPOS, node, anim.Size(), "translateY", false, blenderCorrection);
                             file.WriteLine("}");
                         }
                         else
                         {
                             file.WriteLine("anim translate.translateY translateY " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeNotHasAnimKey(file, anim, vbn, bone, "translateY");
+                            writeNotHasAnimKey(file, anim, vbn, bone, "translateY", blenderCorrection);
                             file.WriteLine("}");
                         }
                         if (node.ZPOS.HasAnimation())
                         {
                             file.WriteLine("anim translate.translateZ translateZ " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeKey(file, node.ZPOS, node, anim.Size(), "translateZ");
+                            writeKey(file, node.ZPOS, node, anim.Size(), "translateZ", false, blenderCorrection);
                             file.WriteLine("}");
                         }
                         else
                         {
                             file.WriteLine("anim translate.translateZ translateZ " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeNotHasAnimKey(file, anim, vbn, bone, "translateZ");
+                            writeNotHasAnimKey(file, anim, vbn, bone, "translateZ", blenderCorrection);
                             file.WriteLine("}");
                         }
                         if (node.XROT.HasAnimation())
                         {
                             file.WriteLine("anim rotate.rotateX rotateX " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeKey(file, node.XROT, node, anim.Size(), "rotateX");
+                            writeKey(file, node.XROT, node, anim.Size(), "rotateX", false, blenderCorrection);
                             file.WriteLine("}");
                         }
                         if (node.YROT.HasAnimation())
                         {
                             file.WriteLine("anim rotate.rotateY rotateY " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeKey(file, node.YROT, node, anim.Size(), "rotateY");
+                            writeKey(file, node.YROT, node, anim.Size(), "rotateY", false, blenderCorrection);
                             file.WriteLine("}");
                         }
                         if (node.ZROT.HasAnimation())
                         {
                             file.WriteLine("anim rotate.rotateZ rotateZ " + bone.Text + " 0 0 " + (ac++) + ";");
-                            writeKey(file, node.ZROT, node, anim.Size(), "rotateZ");
+                            writeKey(file, node.ZROT, node, anim.Size(), "rotateZ", false, blenderCorrection);
                             file.WriteLine("}");
                         }
 
@@ -329,7 +335,7 @@ namespace Toolbox.Library.Animations
             }
         }
 
-        private static void writeKey(StreamWriter file, Animation.KeyGroup keys, Animation.KeyNode rt, int size, string type, bool useSegmentCompenseateScale = false)
+        private static void writeKey(StreamWriter file, Animation.KeyGroup keys, Animation.KeyNode rt, int size, string type, bool useSegmentCompenseateScale = false, bool blenderCorrection = false)
         {
             bool isAngular = type == "rotateX" || type == "rotateY" || type == "rotateZ";
 
@@ -354,25 +360,31 @@ namespace Toolbox.Library.Animations
                 switch (type)
                 {
                     case "translateX":
+                        v = blenderCorrection ? -key.Value : key.Value;
+                        break;
                     case "translateY":
+                        v = blenderCorrection ? -key.Value : key.Value;
+                        break;
                     case "translateZ":
                         v = key.Value;
                         break;
                     case "rotateX":
                         if (rt.RotType == Animation.RotationType.EULER)
-                            v = key.Value * Rad2Deg;
+                            v = (blenderCorrection ? -key.Value : key.Value) * Rad2Deg;
                         if (rt.RotType == Animation.RotationType.QUATERNION)
                         {
                             Quaternion q = new Quaternion(rt.XROT.GetValue(key.Frame), rt.YROT.GetValue(key.Frame), rt.ZROT.GetValue(key.Frame), rt.WROT.GetValue(key.Frame));
+                            if (blenderCorrection) q = new Quaternion(-q.X, -q.Y, q.Z, q.W);
                             v = quattoeul(q).X * Rad2Deg;
                         }
                         break;
                     case "rotateY":
                         if (rt.RotType == Animation.RotationType.EULER)
-                            v = key.Value * Rad2Deg;
+                            v = (blenderCorrection ? -key.Value : key.Value) * Rad2Deg;
                         if (rt.RotType == Animation.RotationType.QUATERNION)
                         {
                             Quaternion q = new Quaternion(rt.XROT.GetValue(key.Frame), rt.YROT.GetValue(key.Frame), rt.ZROT.GetValue(key.Frame), rt.WROT.GetValue(key.Frame));
+                            if (blenderCorrection) q = new Quaternion(-q.X, -q.Y, q.Z, q.W);
                             v = quattoeul(q).Y * Rad2Deg;
                         }
                         break;
@@ -382,6 +394,7 @@ namespace Toolbox.Library.Animations
                         if (rt.RotType == Animation.RotationType.QUATERNION)
                         {
                             Quaternion q = new Quaternion(rt.XROT.GetValue(key.Frame), rt.YROT.GetValue(key.Frame), rt.ZROT.GetValue(key.Frame), rt.WROT.GetValue(key.Frame));
+                            if (blenderCorrection) q = new Quaternion(-q.X, -q.Y, q.Z, q.W);
                             v = quattoeul(q).Z * Rad2Deg;
                         }
                         break;
@@ -401,8 +414,7 @@ namespace Toolbox.Library.Animations
             file.WriteLine(" }");
         }
 
-        private static void writeNotHasAnimKey(StreamWriter file, Animation anim, STSkeleton vbn, STBone bone, string type)
-
+        private static void writeNotHasAnimKey(StreamWriter file, Animation anim, STSkeleton vbn, STBone bone, string type, bool blenderCorrection = false)
         {
             anim.SetFrame(0);
             anim.NextFrame(vbn, false, true);
@@ -418,10 +430,10 @@ namespace Toolbox.Library.Animations
             switch (type)
             {
                 case "translateX":
-                    file.WriteLine(" " + 0 + " {0:N6} fixed fixed 1 1 0 0 1 0 1;".Replace(",", "."), translate.X);
+                    file.WriteLine(" " + 0 + " {0:N6} fixed fixed 1 1 0 0 1 0 1;".Replace(",", "."), blenderCorrection ? -translate.X : translate.X);
                     break;
                 case "translateY":
-                    file.WriteLine(" " + 0 + " {0:N6} fixed fixed 1 1 0 0 1 0 1;".Replace(",", "."), translate.Y);
+                    file.WriteLine(" " + 0 + " {0:N6} fixed fixed 1 1 0 0 1 0 1;".Replace(",", "."), blenderCorrection ? -translate.Y : translate.Y);
                     break;
                 case "translateZ":
                     file.WriteLine(" " + 0 + " {0:N6} fixed fixed 1 1 0 0 1 0 1;".Replace(",", "."), translate.Z);

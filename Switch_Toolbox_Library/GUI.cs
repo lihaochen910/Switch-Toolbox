@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -63,7 +63,7 @@ namespace Toolbox.Library
         }
         public static ObjectEditor GetObjectEditor()
         {
-            if (Runtime.MainForm.ActiveMdiChild is ObjectEditor)
+            if (Runtime.MainForm != null && Runtime.MainForm.ActiveMdiChild is ObjectEditor)
             {
                 return (ObjectEditor)Runtime.MainForm.ActiveMdiChild;
             }
